@@ -9,13 +9,15 @@
 This repository accompanies our research paper titled "[Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)." It contains our core simulation module for  generative agents—computational agents that simulate believable human behaviors—and their game environment. Below, we document the steps for setting up the simulation environment on your local machine and for replaying the simulation as a demo animation.
 
 ## <img src="https://joonsungpark.s3.amazonaws.com:443/static/assets/characters/profile/Isabella_Rodriguez.png" alt="Generative Isabella">   Setting Up the Environment 
-To set up your environment, you will need to generate a `utils.py` file that contains your OpenAI API key and download the necessary packages.
+To set up your environment, you will need to generate a `utils.py` file that contains your Langflow API credentials and download the necessary packages.
 
 ### Step 1. Generate Utils File
 In the `reverie/backend_server` folder (where `reverie.py` is located), create a new file titled `utils.py` and copy and paste the content below into the file:
-```
-# Copy and paste your OpenAI API Key
-openai_api_key = "<Your OpenAI API>"
+```python
+# Langflow API Configuration
+LANGFLOW_BASE_API_URL = "<Your Langflow API URL>"
+LANGFLOW_APPLICATION_TOKEN = "<Your Langflow Application Token>"
+
 # Put your name
 key_owner = "<Name>"
 
@@ -31,7 +33,7 @@ collision_block_id = "32125"
 # Verbose 
 debug = True
 ```
-Replace `<Your OpenAI API>` with your OpenAI API key, and `<name>` with your name.
+Replace `<Your Langflow API URL>` with your Langflow API URL, `<Your Langflow Application Token>` with your Langflow application token, and `<name>` with your name.
  
 ### Step 2. Install requirements.txt
 Install everything listed in the `requirements.txt` file (I strongly recommend first setting up a virtualenv as usual). A note on Python version: we tested our environment on Python 3.9.12. 
