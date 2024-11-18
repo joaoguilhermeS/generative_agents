@@ -76,8 +76,7 @@ def run_gpt_prompt_wake_up_hour(persona, test_input=None, verbose=False):
   prompt = generate_prompt(prompt_input, prompt_template)
   fail_safe = get_fail_safe()
 
-  output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
-                                   __func_validate, __func_clean_up)
+  output = safe_generate_response(prompt, agent_type="default", repeat=5, fail_safe_response=fail_safe, function_name="generate_wake_up_hour")
   
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
@@ -146,8 +145,7 @@ def run_gpt_prompt_daily_plan(persona,
   prompt = generate_prompt(prompt_input, prompt_template)
   fail_safe = get_fail_safe()
   
-  output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
-                                   __func_validate, __func_clean_up)
+  output = safe_generate_response(prompt, agent_type="default", repeat=5, fail_safe_response=fail_safe, function_name="generate_wake_up_hour")
   output = ([f"wake up and complete the morning routine at {wake_up_hour}:00 am"]
               + output)
 
@@ -402,42 +400,33 @@ def run_gpt_prompt_task_decomp(persona,
 
   print ("?????")
   print (prompt)
-  output = safe_generate_response(prompt, gpt_param, 5, get_fail_safe(),
+  output = safe_generate_response(prompt, "run_gpt_prompt_task_decomp", "default", 5, get_fail_safe(),
                                    __func_validate, __func_clean_up)
 
-  # TODO THERE WAS A BUG HERE... 
-  # This is for preventing overflows...
-  """
-  File "/Users/joonsungpark/Desktop/Stanford/Projects/
-  generative-personas/src_exploration/reverie_simulation/
-  brain/get_next_action_v3.py", line 364, in run_gpt_prompt_task_decomp
-  fin_output[-1][1] += (duration - ftime_sum)
-  IndexError: list index out of range
-  """
-
   print ("IMPORTANT VVV DEBUG")
-
-  # print (prompt_input)
-  # print (prompt)
   print (output)
 
   fin_output = []
   time_sum = 0
-  for i_task, i_duration in output: 
-    time_sum += i_duration
-    # HM?????????
-    # if time_sum < duration: 
-    if time_sum <= duration: 
-      fin_output += [[i_task, i_duration]]
-    else: 
-      break
-  ftime_sum = 0
-  for fi_task, fi_duration in fin_output: 
-    ftime_sum += fi_duration
   
-  # print ("for debugging... line 365", fin_output)
-  fin_output[-1][1] += (duration - ftime_sum)
-  output = fin_output 
+  # Check if output is a list of lists
+  if isinstance(output, list) and all(isinstance(item, list) for item in output):
+    for i_task, i_duration in output:
+      time_sum += i_duration
+      if time_sum <= duration:
+        fin_output.append([i_task, i_duration])
+      else:
+        break
+  else:
+    # If output is not in the expected format, use the fail-safe
+    fin_output = fail_safe
+
+  ftime_sum = sum(fi_duration for item in fin_output for _, fi_duration in [item] if isinstance(item, (list, tuple)) and len(item) >= 2)
+  
+  if fin_output:
+    fin_output[-1][1] += (duration - ftime_sum)
+  
+  output = fin_output
 
 
 
@@ -459,6 +448,7 @@ def run_gpt_prompt_task_decomp(persona,
 def run_gpt_prompt_action_sector(action_description, 
                                 persona, 
                                 maze, 
+                                repeat=5,
                                 test_input=None, 
                                 verbose=False):
   def create_prompt_input(action_description, persona, maze, test_input=None): 
@@ -497,11 +487,6 @@ def run_gpt_prompt_action_sector(action_description,
     return prompt_input
 
 
-    
-
-    
-
-
   def __func_clean_up(gpt_response, prompt=""):
     cleaned_response = gpt_response.split("}")[0]
     return cleaned_response
@@ -516,7 +501,7 @@ def run_gpt_prompt_action_sector(action_description,
     return True
   
   def get_fail_safe(): 
-    fs = ("kitchen")
+    fs = "kitchen"
     return fs
 
   gpt_param = {"engine": "text-davinci-002", "max_tokens": 15, 
@@ -527,7 +512,7 @@ def run_gpt_prompt_action_sector(action_description,
   prompt = generate_prompt(prompt_input, prompt_template)
 
   fail_safe = get_fail_safe()
-  output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
+  output = safe_generate_response(prompt, "run_gpt_prompt_action_sector", "default", repeat, fail_safe,
                                    __func_validate, __func_clean_up)
   y = f"{maze.access_tile(persona.scratch.curr_tile)['world']}"
   x = [i.strip() for i in persona.s_mem.get_str_accessible_sectors(y).split(",")]

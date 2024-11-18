@@ -1,228 +1,133 @@
-"""
-Author: Joon Sung Park (joonspk@stanford.edu)
-
-File: gpt_structure.py
-Description: Wrapper functions for calling OpenAI APIs.
-"""
 import json
 import random
-import time 
+import requests
+import time
+import os
+import openai
 from utils import *
-from .run_gpt_prompt import safe_generate_response
+
+openai.api_key = openai_api_key
+
+# LangFlow Configuration
+LANGFLOW_BASE_API_URL = "http://127.0.0.1:7860"
+LANGFLOW_FLOW_ID = "0e3371f1-d48b-47dd-b20f-7a443d784b99"
+LANGFLOW_APPLICATION_TOKEN = "sk-ddD9SKkA1TJh4yHngsRsAb2masKeeqviNWMaCGgiAXs"
 
 def temp_sleep(seconds=0.1):
-  time.sleep(seconds)
+    time.sleep(seconds)
 
-def ChatGPT_single_request(prompt, agent_type="default"): 
-  temp_sleep()
-  return safe_generate_response(prompt, agent_type)
+def safe_generate_response(message, agent_type="default", repeat=5, fail_safe_response="error", func_validate=None, func_clean_up=None, verbose=False):
+    """
+    Generates a safe response using LangFlow with optional validation and cleanup.
+    """
+    if verbose: 
+        print(f"Sending message to LangFlow: {message}")
 
-# ============================================================================
-# #####################[SECTION 1: CHATGPT-3 STRUCTURE] ######################
-# ============================================================================
+    for attempt in range(repeat): 
+        try:
+            # Make LangFlow request
+            flow = AGENT_FLOWS.get(agent_type, AGENT_FLOWS.get("default"))
+            # Add the rest of the logic for handling the flow here
+            # For now, let's just simulate a response
+            response = LangFlow_request(message)
+            if func_validate and func_validate(response):
+                return func_clean_up(response)
+        except Exception as e:
+            if verbose:
+                print(f"Attempt {attempt} failed with error: {str(e)}")
+            continue
 
-def GPT4_request(prompt, agent_type="default"): 
-  """
-  Given a prompt, make a request to LangFlow and returns the response. 
-  ARGS:
-    prompt: a str prompt
-    agent_type: the type of agent to use (default or others defined in AGENT_FLOWS)
-  RETURNS: 
-    a str of LangFlow's response. 
-  """
-  temp_sleep()
-  try: 
-    return safe_generate_response(prompt, agent_type)
-  except: 
-    print ("LangFlow ERROR")
-    return "LangFlow ERROR"
-
-def ChatGPT_request(prompt, agent_type="default"): 
-  """
-  Given a prompt, make a request to LangFlow and returns the response. 
-  ARGS:
-    prompt: a str prompt
-    agent_type: the type of agent to use (default or others defined in AGENT_FLOWS)
-  RETURNS: 
-    a str of LangFlow's response. 
-  """
-  try: 
-    return safe_generate_response(prompt, agent_type)
-  except: 
-    print ("LangFlow ERROR")
-    return "LangFlow ERROR"
-
-def GPT4_safe_generate_response(prompt, 
-                                example_output,
-                                special_instruction,
-                                repeat=3,
-                                fail_safe_response="error",
-                                func_validate=None,
-                                func_clean_up=None,
-                                verbose=False,
-                                agent_type="default"): 
-  prompt = 'LangFlow Prompt:\n"""\n' + prompt + '\n"""\n'
-  prompt += f"{special_instruction}\n"
-  prompt += f"Example output: {str(example_output)}"
-
-  if verbose: 
-    print ("LANGFLOW PROMPT")
-    print (prompt)
-
-  for i in range(repeat): 
-    try: 
-      curr_response = GPT4_request(prompt, agent_type).strip()
-      
-      if func_validate(curr_response, prompt=prompt): 
-        return func_clean_up(curr_response, prompt=prompt) if func_clean_up else curr_response
-      
-      if verbose: 
-        print (f"---- repeat count: {i}")
-        print (curr_response)
-        print ("~~~~")
-
-    except Exception as e: 
-      if verbose:
-        print(f"Error in GPT4_safe_generate_response: {str(e)}")
-      pass
-
-  return fail_safe_response
-
-def ChatGPT_safe_generate_response(prompt, 
-                                   example_output,
-                                   special_instruction,
-                                   repeat=3,
-                                   fail_safe_response="error",
-                                   func_validate=None,
-                                   func_clean_up=None,
-                                   verbose=False,
-                                   agent_type="default"): 
-  prompt = '"""\n' + prompt + '\n"""\n'
-  prompt += f"{special_instruction}\n"
-  prompt += f"Example output: {str(example_output)}"
-
-  if verbose: 
-    print ("LANGFLOW PROMPT")
-    print (prompt)
-
-  for i in range(repeat): 
-    try: 
-      curr_response = ChatGPT_request(prompt, agent_type).strip()
-      
-      if func_validate(curr_response, prompt=prompt): 
-        return func_clean_up(curr_response, prompt=prompt) if func_clean_up else curr_response
-      
-      if verbose: 
-        print (f"---- repeat count: {i}")
-        print (curr_response)
-        print ("~~~~")
-
-    except Exception as e: 
-      if verbose:
-        print(f"Error in ChatGPT_safe_generate_response: {str(e)}")
-      pass
-
-  return fail_safe_response
-
-def generate_prompt(curr_input, prompt_lib_file): 
-  """
-  Takes in the current input (e.g. comment that you want to classifiy) and 
-  the path to a prompt file. The prompt file contains the raw str prompt that
-  will be used, which contains the following substr: !<INPUT>! -- this 
-  function replaces this substr with the actual curr_input to produce the 
-  final promopt that will be sent to the LangFlow server. 
-  ARGS:
-    curr_input: the input we want to feed in (IF THERE ARE MORE THAN ONE
-                INPUT, THIS CAN BE A LIST.)
-    prompt_lib_file: the path to the promopt file. 
-  RETURNS: 
-    a str prompt that will be sent to LangFlow server.  
-  """
-  if type(curr_input) == type("string"): 
-    curr_input = [curr_input]
-  curr_input = [str(i) for i in curr_input]
-
-  f = open(prompt_lib_file, "r")
-  prompt = f.read()
-  f.close()
-  for count, i in enumerate(curr_input):   
-    prompt = prompt.replace(f"!<INPUT {count}>!", i)
-  if "<commentblockmarker>###</commentblockmarker>" in prompt: 
-    prompt = prompt.split("<commentblockmarker>###</commentblockmarker>")[1]
-  return prompt.strip()
-
-def safe_generate_response(prompt, 
-                           agent_type="default",
-                           repeat=5,
-                           fail_safe_response="error",
-                           func_validate=None,
-                           func_clean_up=None,
-                           verbose=False): 
-  if verbose: 
-    print(f"Sending prompt to LangFlow for agent type {agent_type}: {prompt}")
-
-  flow = AGENT_FLOWS.get(agent_type, AGENT_FLOWS["default"])
-
-  for attempt in range(repeat): 
+def LangFlow_request(message):
+    """
+    Send a request to the LangFlow API with the given prompt.
+    """
     try:
-      response = ChatGPT_request(prompt, agent_type)
-      
-      if func_validate and func_validate(response, prompt=prompt): 
-        return func_clean_up(response, prompt=prompt) if func_clean_up else response
-      
-      if verbose: 
-        print(f"---- Repeat count: {attempt}")
-        print(response)
-        print("~~~~")
+        api_url = f"{LANGFLOW_BASE_API_URL}/api/v1/run/{LANGFLOW_FLOW_ID}?stream=false"
         
-    except Exception as e:
-      if verbose:
-        print(f"Attempt {attempt} failed with error: {str(e)}")
-      continue
-      
-  return fail_safe_response
+        payload = {
+            "input_value": message,
+            "output_type": "chat",
+            "input_type": "chat",
+            "tweaks": {
+                "ChatInput-Yqb6n": {},
+                "ChatOutput-wSm2d": {},
+                "OpenAIModel-sOWWG": {},
+                "Prompt-MJkDg": {
+                    "template": "Respond based on user request:\n\nuser request: {user_request}\n\nResponse:"
+                }
+            }
+        }
+
+        headers = {
+            "Authorization": f"Bearer {LANGFLOW_APPLICATION_TOKEN}",
+            "Content-Type": "application/json"
+        }
+
+        response = requests.post(api_url, json=payload, headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+    except requests.exceptions.RequestException as e:
+        print(f"LangFlow API Error: {str(e)}")
+        return {"error": str(e)}
+
+
+
+
+    except requests.exceptions.RequestException as e:
+        print(f"LangFlow API Error: {str(e)}")
+        return {"error": str(e)}
+
+def generate_prompt(curr_input, prompt_lib_file):
+    """
+    Generates the final prompt by replacing placeholders in the prompt template with actual inputs.
+    """
+    if isinstance(curr_input, str):
+        curr_input = [curr_input]
+    else:
+        curr_input = [str(i) for i in curr_input]
+
+    with open(prompt_lib_file, "r") as f:
+        prompt = f.read()
+
+    for count, item in enumerate(curr_input):   
+        prompt = prompt.replace(f"!<INPUT {count}>!", item)
+        
+    if "<commentblockmarker>###</commentblockmarker>" in prompt: 
+        prompt = prompt.split("<commentblockmarker>###</commentblockmarker>")[1]
+        
+    return prompt.strip()
+
+def get_embedding(text, model="text-embedding-ada-002"):
+    """
+    Generates an embedding for the given text using OpenAI's embedding API.
+    """
+    text = text.replace("\n", " ")
+    if not text: 
+        text = "this is blank"
+    return openai.Embedding.create(
+            input=[text], model=model)['data'][0]['embedding']
 
 if __name__ == '__main__':
-  curr_input = ["driving to a friend's house"]
-  prompt_lib_file = "prompt_template/test_prompt_July5.txt"
-  prompt = generate_prompt(curr_input, prompt_lib_file)
+    message = "driving to a friend's house"
+    prompt_lib_file = "prompt_template/test_prompt_July5.txt"
+    prompt = generate_prompt(message, prompt_lib_file)
 
-  def __func_validate(response): 
-    if len(response.strip()) <= 1:
-      return False
-    if len(response.strip().split(" ")) > 1: 
-      return False
-    return True
-  def __func_clean_up(response):
-    cleaned_response = response.strip()
-    return cleaned_response
+    def __func_validate(langflow_response):
+        if "error" in langflow_response:
+            return False
+        return True
 
-  output = safe_generate_response(prompt, 
-                                 "default",
-                                 5,
-                                 "rest",
-                                 __func_validate,
-                                 __func_clean_up,
-                                 True)
+    def __func_clean_up(langflow_response):
+        return langflow_response.get("output", "error")
 
-  print (output)
+    output = safe_generate_response(
+        message=prompt,
+        repeat=5,
+        fail_safe_response="rest",
+        func_validate=__func_validate,
+        func_clean_up=__func_clean_up,
+        verbose=True
+    )
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    print(output)

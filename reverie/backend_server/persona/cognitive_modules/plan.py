@@ -15,10 +15,19 @@ from global_methods import *
 from persona.prompt_template.run_gpt_prompt import *
 from persona.cognitive_modules.retrieve import *
 from persona.cognitive_modules.converse import *
+from persona.prompt_template.defunct_run_gpt_prompt import (
+    run_gpt_prompt_daily_plan, 
+    run_gpt_prompt_wake_up_hour, 
+    run_gpt_prompt_task_decomp,
+    run_gpt_prompt_action_sector,
+    run_gpt_prompt_action_arena
+)
 
 ##############################################################################
 # CHAPTER 2: Generate
 ##############################################################################
+
+from ..prompt_template.defunct_run_gpt_prompt import run_gpt_prompt_wake_up_hour
 
 def generate_wake_up_hour(persona):
   """
@@ -161,7 +170,14 @@ def generate_task_decomp(persona, task, duration):
 
   """
   if debug: print ("GNS FUNCTION: <generate_task_decomp>")
-  return run_gpt_prompt_task_decomp(persona, task, duration)[0]
+  try:
+    result = run_gpt_prompt_task_decomp(persona, task, duration)[0]
+    # Ensure the result is a list of tuples with two elements
+    return [(item[0], item[1]) if isinstance(item, (list, tuple)) and len(item) >= 2 else (str(item), 5) for item in result]
+  except Exception as e:
+    print(f"Error generating task decomposition: {e}")
+    # Return an empty list or a default task in case of error
+    return [("Perform generic task", duration)]
 
 
 def generate_action_sector(act_desp, persona, maze): 
@@ -179,7 +195,7 @@ def generate_action_sector(act_desp, persona, maze):
     "bedroom 2"
   """
   if debug: print ("GNS FUNCTION: <generate_action_sector>")
-  return run_gpt_prompt_action_sector(act_desp, persona, maze)[0]
+  return run_gpt_prompt_action_sector(act_desp, persona, maze, repeat=5)[0]
 
 
 def generate_action_arena(act_desp, persona, maze, act_world, act_sector): 

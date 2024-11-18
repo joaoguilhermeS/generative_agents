@@ -2,12 +2,11 @@ import json
 import random
 import requests
 import time
-import os
 from utils import *
+import openai
 
-# LangFlow Configuration
-LANGFLOW_BASE_API_URL = "https://api.langflow.astra.datastax.com"
-APPLICATION_TOKEN = os.getenv("LANGFLOW_APPLICATION_TOKEN")
+# OpenAI Configuration
+openai.api_key = openai_api_key
 
 # Agent Flow Configuration
 AGENT_FLOWS = {
@@ -21,8 +20,8 @@ AGENT_FLOWS = {
         "presence_penalty": 0
     },
     "creative": {
-        "id": "creative-flow-id",
-        "endpoint": "creative-flow-endpoint",
+        "id": "0586a787-50ae-4a4e-aebe-866cf022aa5b",
+        "endpoint": "9ec859b3-9d84-4555-9166-52684d8f6e2f",
         "temperature": 0.9,
         "max_tokens": 1500,
         "top_p": 0.95,
@@ -30,8 +29,8 @@ AGENT_FLOWS = {
         "presence_penalty": 0.1
     },
     "analytical": {
-        "id": "analytical-flow-id",
-        "endpoint": "analytical-flow-endpoint",
+        "id": "0586a787-50ae-4a4e-aebe-866cf022aa5b",
+        "endpoint": "9ec859b3-9d84-4555-9166-52684d8f6e2f",
         "temperature": 0.3,
         "max_tokens": 2000,
         "top_p": 1,
@@ -44,14 +43,18 @@ AGENT_FLOWS = {
 def temp_sleep(seconds=0.1):
     time.sleep(seconds)
 
-def safe_generate_response(message, agent_type="default", repeat=5, fail_safe_response="error", func_validate=None, func_clean_up=None, verbose=False):
+def safe_generate_response(message, function_name=" ", agent_type="default", repeat=5, fail_safe_response="error", func_validate=None, func_clean_up=None, verbose=False):
+    repeat = int(repeat)
+    
+    if not isinstance(repeat, int):
+        raise ValueError(f"Invalid repeat value: {repeat}. It must be an integer.")
     """
     Generates a safe response using LangFlow with optional validation and cleanup.
     """
     if verbose: 
         print(f"Sending message to LangFlow for agent type {agent_type}: {message}")
 
-    flow = AGENT_FLOWS.get(agent_type, AGENT_FLOWS["default"])
+    flow = AGENT_FLOWS.get(agent_type, AGENT_FLOWS["default"]) if isinstance(agent_type, str) else AGENT_FLOWS["default"]
 
     for attempt in range(repeat): 
         try:
@@ -70,7 +73,24 @@ def safe_generate_response(message, agent_type="default", repeat=5, fail_safe_re
 
             # Validate and clean up
             if func_validate and func_validate(text_response, prompt=message): 
-                return func_clean_up(text_response, prompt=message) if func_clean_up else text_response
+                cleaned_response = func_clean_up(text_response, prompt=message) if func_clean_up else text_response
+                
+                # Additional parsing for task decomposition
+                if function_name == "run_gpt_prompt_task_decomp":
+                    try:
+                        parsed_response = []
+                        for line in cleaned_response.split('\n'):
+                            if ') ' in line:
+                                task = line.split(') ', 1)[1].split(' (duration')[0].strip()
+                                duration = int(line.split('duration in minutes: ')[1].split(',')[0])
+                                parsed_response.append([task, duration])
+                        return parsed_response
+                    except:
+                        if verbose:
+                            print(f"Failed to parse task decomposition response: {cleaned_response}")
+                        continue
+                
+                return cleaned_response
             
             if verbose: 
                 print(f"---- Repeat count: {attempt}")
@@ -124,9 +144,19 @@ def LangFlow_request(message, flow_config):
         print(f"LangFlow API Error: {str(e)}")
         return {"error": str(e)}
 
-
-
-def generate_prompt(curr_input, prompt_lib_file):
+def run_gpt_prompt_generate_hourly_schedule(persona, curr_hour_str, n_m1_activity, hour_str, test_input=None):
+    """
+    Generates an hourly schedule for the persona based on the current hour and other parameters.
+    """
+    # Implement the logic for generating the hourly schedule here
+    # This is a placeholder implementation
+    return [f"activity at {curr_hour_str}"]
+    """
+    Generates a daily plan for the persona based on the wake-up hour.
+    """
+    # Implement the logic for generating a daily plan here
+    # This is a placeholder implementation
+    return [f"wake up at {wake_up_hour}:00 and start the day"]
     """
     Generates the final prompt by replacing placeholders in the prompt template with actual inputs.
     """
